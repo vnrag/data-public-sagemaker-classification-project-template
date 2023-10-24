@@ -171,10 +171,7 @@ def get_pipeline(
     model_approval_status = ParameterString(
         name="ModelApprovalStatus", default_value="PendingManualApproval"
     )
-    input_data = ParameterString(
-        name="InputDataUrl",
-        default_value="example_s3_path",
-    )
+
     use_case = ParameterString(
         name="UseCase", default_value=use_case
     )
@@ -207,11 +204,13 @@ def get_pipeline(
             ProcessingOutput(output_name="test", source="/opt/ml/processing/test"),
         ],
         code=os.path.join(BASE_DIR, "preprocess.py"),
-        arguments=["--input-data", "example_s3_path"],
-        #arguments=["--input-data", input_data],
+        #arguments=["--input-data", "example_s3_path"],
+        #    input_data='s3://px-data-ml-ops-data/features/telesales_gsa/feature_telesales_gsa.csv',
+        # you need to change the bucket !!!!
+        arguments=["--input-data", Join(on='/', values=['s3://px-data-ml-ops-data', 'features', base_job_prefix, use_case, 'feature_telesales.csv'])]
     )
     step_process = ProcessingStep(
-        name="PreprocessTMGSAData",
+        name="PreprocessClassificationData",
         step_args=step_args
     )
 
@@ -294,7 +293,7 @@ def get_pipeline(
         instance_count=1,
         base_job_name="machine-learning-plx-classification",
         sagemaker_session=pipeline_session,
-        role=role,
+        role=role
     )
     
     step_args = script_eval.run(
@@ -317,7 +316,7 @@ def get_pipeline(
         outputs=[
             ProcessingOutput(output_name="evaluation", source="/opt/ml/processing/evaluation"),
         ],
-        code=Join=(on='/',values=[BASE_DIR,evaluation_script]),
+        code=Join(on='/',values=[BASE_DIR,evaluation_script])
     )
 
     evaluation_report = PropertyFile(
@@ -330,7 +329,7 @@ def get_pipeline(
         step_args=step_args,
         property_files=[evaluation_report],
     )
-
+    
     # register model step that will be conditionally executed
     model_metrics = ModelMetrics(
         model_statistics=MetricsSource(
@@ -361,11 +360,8 @@ def get_pipeline(
         name="RegisterPLXClassificationModel",
         step_args=step_args,
     )
-    
     # model_name = step_register.properties.ModelName
-
     # condition step for evaluating model quality and branching execution
-    
     # f1 > 0.5
     cond_lte = ConditionGreaterThan(
         left=JsonGet(
@@ -390,7 +386,6 @@ def get_pipeline(
             processing_instance_count,
             training_instance_type,
             model_approval_status,
-            input_data,
             image_uri,
             use_case,
             base_job_prefix,
