@@ -296,11 +296,14 @@ def get_pipeline(
         sagemaker_session=pipeline_session,
         role=role,
     )
+    
     step_args = script_eval.run(
         inputs=[
             ProcessingInput(
                 source=step_tuning.get_top_model_s3_uri(
-                top_k=0, s3_bucket=default_bucket, prefix=Join(on='/',values=[base_job_prefix,use_case,'train'])
+                top_k=0, 
+                s3_bucket=default_bucket, 
+                prefix=Join(on='/',values=[base_job_prefix,use_case,'train'])
             ),
                 destination="/opt/ml/processing/model",
             ),
@@ -316,6 +319,7 @@ def get_pipeline(
         ],
         code=Join=(on='/',values=[BASE_DIR,evaluation_script]),
     )
+
     evaluation_report = PropertyFile(
         name="PLXClassificationEvaluationReport",
         output_name="evaluation",

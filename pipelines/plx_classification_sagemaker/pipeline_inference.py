@@ -38,6 +38,7 @@ from sagemaker.workflow.condition_step import (
 )
 from sagemaker.workflow.functions import (
     JsonGet,
+    Join
 )
 from sagemaker.workflow.parameters import (
     ParameterInteger,
@@ -144,6 +145,7 @@ def get_pipeline_inference(
     sagemaker_project_name=None,
     role=None,
     default_bucket=None,
+    use_case="ExampleUseCase",
     model_package_group_name="PLXClassificationPackageGroup",
     pipeline_name="PLXClassificationPipelineInference",
     base_job_prefix="PLXClassificationInference",
@@ -182,6 +184,16 @@ def get_pipeline_inference(
     model_name = ParameterString(
         name='ModelName',default_value="s3_example_model.tar.gz")
     
+    # eg GSA for product or ExampleUseCase
+    use_case = ParameterString(
+        name="UseCase", default_value=use_case
+    )
+
+    # e.g TM for telesales
+    base_job_prefix = ParameterString(
+        name="BaseJobPrefix", default_value=base_job_prefix
+    )
+
     image_uri = sagemaker.image_uris.retrieve(
         framework="xgboost",
         region=region,
@@ -210,6 +222,7 @@ def get_pipeline_inference(
     # Convert to string in a specific format
     date_time_string = now.strftime('%Y-%m-%d-%H:%M:%S')
 
+    #Join(on='/',values=['s3:/',sagemaker_session.default_bucket(),f'inference-results-{date_time_string}'])
     
     transformer = Transformer(
     model_name=step_create_model.properties.ModelName,
@@ -217,8 +230,8 @@ def get_pipeline_inference(
     instance_count=1,
     strategy='MultiRecord',
     max_payload=5,
-    base_transform_job_name=f"{base_job_prefix}/sklearn-plx-classification-inference",
-    output_path=f"s3://{default_bucket}/TMGSA/inference/results-{date_time_string}/",
+    base_transform_job_name="machine-learning-plx-classification-inference",
+    output_path=Join(on='/',values=['s3:/',sagemaker_session.default_bucket(),base_job_prefix,use_case,f'inference-results-{date_time_string}']),
     assemble_with = 'Line', 
     accept = 'text/csv'
     )
@@ -228,8 +241,6 @@ def get_pipeline_inference(
     step_transform = TransformStep(
         name="PLXClassificationTransform", 
         transformer=transformer, inputs=TransformInput(input_location, split_type='Line',content_type='text/csv', input_filter='$[:-1]', join_source='Input', output_filter='$[-2,-1]')
-        
-        
     )
 
     # pipeline instance
@@ -240,7 +251,8 @@ def get_pipeline_inference(
             processing_instance_count,
             inference_instance_type,
             model_name,
-            input_data
+            input_data,
+            use_case
         ],
         steps=[step_create_model, step_transform],
         sagemaker_session=pipeline_session,
